@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PostulaT - Plataforma de Empleo</title>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial Rounded MT Bold, Arial, sans-serif;
+      margin: 0;
+      background: #001a33;
+      color: #000;
+    }
+
+    header {
+      background: #ffffff;
+      padding: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 4px solid #004080;
+    }
+
+    .logo-box img {
+      height: 100px;
+      width: 250px;
+      object-fit: contain;
+    }
+
+    .hamburger {
+      font-size: 40px;
+      cursor: pointer;
+      color: #001a33;
+      padding: 10px;
+    }
+
+    #menuLateral {
+      position: fixed;
+      top: 0;
+      right: -280px;
+      width: 260px;
+      height: 100%;
+      background: #001a33;
+      color: white;
+      padding: 20px;
+      transition: right 0.35s ease;
+      z-index: 9999;
+      box-shadow: -3px 0 10px rgba(0,0,0,0.4);
+    }
+
+    #menuLateral button {
+      width: 100%;
+      margin: 10px 0;
+      padding: 12px;
+      background: #003366;
+      border: none;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.45);
+      display: none;
+      z-index: 999;
+    }
+
+    .box {
+      background: #bdc8ff;
+      margin: 20px;
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 4px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 12px;
+      padding: 12px;
+      cursor: pointer;
+      background: #003366;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      width: 100%;
+    }
+
+    .vacante {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-top: 10px;
+      border-radius: 8px;
+      background: #f7f7f7;
+    }
+
+    .box-flex {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .split-container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .split-left {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .split-right {
+      flex: 1;
+      min-width: 300px;
+      background: #ffffff;
+      padding: 15px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pregunta-test {
+      background: #fff;
+      padding: 15px;
+      margin-top: 12px;
+      border-radius: 6px;
+      border-left: 5px solid #003366;
+    }
+
+    .pregunta-test p {
+      margin: 0 0 8px 0;
+      font-weight: bold;
+    }
+
+    .pregunta-test select {
+      width: auto;
+      min-width: 200px;
+      background: #fdfdfd;
+    }
+
+    @media (max-width: 800px) {
+      .box-flex {
+        flex-direction: column !important;
+      }
+      .box-flex img,
+      .box-flex > div {
+        width: 100% !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="logo-box">
+      <img src="imagenes logo.png" alt="Logo Postúlate">
+    </div>
+    <div class="hamburger" onclick="toggleMenu()">☰</div>
+  </header>
+
+  <!-- MENÚ LATERAL -->
+  <div id="menuLateral">
+    <h3>Menú</h3>
+    <button onclick="mostrarInicio(); toggleMenu()">Inicio</button>
+    <button onclick="mostrarPerfil(); toggleMenu()">Perfil</button>
+    <button onclick="explorarVacantesPostulante(); toggleMenu()">Explorar vacantes</button>
+    <button onclick="mostrarLogin(); toggleMenu()">Iniciar sesión</button>
+    <button onclick="registrar() && toggleMenu()">Registrar</button>
+    <button onclick="cerrarSesion(); toggleMenu()">Cerrar sesión</button>
+  </div>
+
+  <div id="overlay" onclick="toggleMenu()"></div>
+
+  <div id="contenido"></div>
+
+  <script>
+/* MENÚ */
+function toggleMenu() {
+  const menu = document.getElementById("menuLateral");
+  const overlay = document.getElementById("overlay");
+
+  if (menu.style.right === "0px") {
+    menu.style.right = "-280px";
+    overlay.style.display = "none";
+  } else {
+    menu.style.right = "0px";
+    overlay.style.display = "block";
+  }
+}
+
+/* FIREBASE CONFIGURATION */
+const firebaseConfig = {
+  apiKey: "AIzaSyA8OpJcnm9c9dadA-M2iIj1_yPue4HufeE",
+  authDomain: "postulat.firebaseapp.com",
+  databaseURL: "https://postulat-default-rtdb.firebaseio.com",
+  projectId: "postulat",
+  storageBucket: "postulat.firebasestorage.app",
+  messagingSenderId: "35414126435",
+  appId: "1:35414126435:web:4aa28d4b080ed969fb6d56",
+  measurementId: "G-0FFM32NFY8"
+};
+
+let firebaseApp = null;
+let auth = null;
+let db = null;
+
+const usuariosCache = {};
+let currentUser = null;
+let vacantes = [];
+
+const PLANTILLA_VACANTES = [
+  { titulo: "Asistente Administrativo", area: "Administración", salario: "$450", estado: "Lara", horario: "Lunes a Viernes 8:00 am - 5:00 pm", habilidades: "excel, organizacion, archivo, redaccion", descripcion: "Buscamos personal para control de archivos, conciliaciones bancarias y atención telefónica corporativa.", experiencia: "1 año", postulados: [], esDemo: true },
+  { titulo: "Analista de Facturación y Cobranzas", area: "Administración", salario: "$550", estado: "Lara", horario: "Lunes a Viernes 8:00 am - 5:00 pm", habilidades: "excel, facturacion, cuentas por cobrar, SAP", descripcion: "Encargado de la emisión de facturas, seguimiento de carteras de clientes y reportes financieros semanales.", experiencia: "2 años", postulados: [], esDemo: true },
+  { titulo: "Desarrollador Web Front-End", area: "Tecnología", salario: "$800", estado: "Remoto", horario: "Flexible", habilidades: "html, javascript, css, bootstrap, git", descripcion: "Desarrollo de interfaces web interactivas, maquetación adaptativa y optimización de plataformas digitales.", experiencia: "2 años", postulados: [], esDemo: true },
+  { titulo: "Analista de Reclutamiento y Selección", area: "Recursos Humanos", salario: "$550", estado: "Lara", horario: "Lunes a Viernes 8:00 am - 5:00 pm", habilidades: "entrevistas, perfiles, vinculacion, pruebas psicometricas", descripcion: "Publicación de ofertas laborales, filtrado de currículos, aplicación de evaluaciones de personalidad y entrevistas iniciales.", experiencia: "2 años", postulados: [], esDemo: true },
+  { titulo: "Pasante de Recursos Humanos", area: "Recursos Humanos", salario: "Bono de pasantías", estado: "Lara", horario: "Medio turno (Mañana o Tarde)", habilidades: "ganas de aprender, proactividad, organizacion, word", descripcion: "Apoyo en el orden de expedientes de personal, llamadas para citar a candidatos y soporte en eventos internos.", experiencia: "Estudiante universitario", postulados: [], esDemo: true }
+];
+
+function firebaseListo() {
+  return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
+}
+
+function inicializarFirebase() {
+  if (!firebaseListo()) {
+    console.warn("Configura firebaseConfig antes de usar la plataforma.");
+    return;
+  }
+
+  firebaseApp = firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+
+  db.collection("vacantes").onSnapshot(async snapshot => {
+    if (snapshot.empty) {
+      for (const v of PLANTILLA_VACANTES) {
+        await db.collection("vacantes").add(v);
+      }
+      return; 
+    }
+
+    const vacantesFirebase = [];
+    snapshot.forEach(doc => {
+      vacantesFirebase.push({ id: doc.id, ...doc.data() });
+    });
+    
+    vacantes = vacantesFirebase;
+  });
+
+  auth.onAuthStateChanged(async user => {
+    if (!user) {
+      currentUser = null;
+      mostrarInicio();
+      return;
+    }
+
+    const usuario = await obtenerUsuarioPorId(user.uid);
+    if (usuario) {
+      currentUser = usuario;
+      mostrarPanelSegunRol();
+    } else {
+      currentUser = { id: user.uid, email: user.email, tipo: null };
+      mostrarInicio();
+    }
+  });
+}
+
+inicializarFirebase();
+
+function fileToBase64(file, callback) {
+  const reader = new FileReader();
+  reader.onload = () => callback(reader.result);
+  reader.readAsDataURL(file);
+}
+
+function fileToBase64Async(file) {
+  return new Promise(resolve => fileToBase64(file, resolve));
+}
+
+async function obtenerUsuarioPorId(id) {
+  if (usuariosCache[id]) return usuariosCache[id];
+  if (!db) return null;
+
+  try {
+    const doc = await db.collection("usuarios").doc(id).get();
+    if (!doc.exists) return null;
+
+    const usuario = { id: doc.id, ...doc.data() };
+    usuariosCache[id] = usuario;
+    return usuario;
+  } catch (error) {
+    console.error("Error al obtener usuario:", error);
+    return null;
+  }
+}
+
+function render(html) {
+  document.getElementById("contenido").innerHTML = html;
+}
+
+/* PANTALLA DE INICIO */
+function mostrarInicio() {
+  render(`
+    <div class="box box-flex">
+      <img src="https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg" style="width:45%; border-radius:10px;">
+      <div style="width:55%;">
+        <h2>🧩 ¿Quiénes somos?</h2>
+        <p>Somos postulaT, una plataforma que conecta talento con oportunidades reales.<p>
+        <p>Hacemos que el reclutamiento sea más ágil, humano y efectivo, ayudando a postulantes y empresas a encontrar su mejor match.</p>
+      </div>
+    </div>
+
+    <div class="box box-flex" style="flex-direction:row-reverse;">
+      <img src="https://images.pexels.com/photos/1181396/pexels-photo-1181396.jpeg" style="width:45%; border-radius:10px;">
+      <div style="width:55%;">
+        <h2>🎯 Misión</h2>Impulsamos talento y mejoramos la forma en que las empresas contratan.<h2>🚀 Visión</h2>
+        <p>Ser la plataforma líder de reclutamiento en Latinoamérica.</p>
+      </div>
+    </div>
+
+    <div class="box box-flex">
+      <img src="https://images.pexels.com/photos/3183197/pexels-photo-3183197.jpeg" style="width:45%; border-radius:10px;">
+      <div style="width:55%;">
+        <h2>⭐ Nuestros valores</h2>
+        <ul>
+          <li>Transparencia — Procesos claros y confiables.</li>
+          <li>Humanidad — El talento primero, más allá del CV.</li>
+          <li>Innovación — Tecnología que mejora el reclutamiento.</li>
+          <li>Confianza — Datos protegidos y evaluaciones responsables.</li>
+          <li>Crecimiento — Impulsamos desarrollo profesional y empresarial.</li>
+        </ul>
+        <button onclick="mostrarRegistro()">Comenzar ahora</button>
+      </div>
+    </div>
+  `);
+}
+
+function mostrarRegistro() {
+  render(`
+    <div class="box">
+      <h2>Registro</h2>
+      <label>Tipo de usuario</label>
+      <select id="tipoUsuario">
+        <option value="">-- Selecciona --</option>
+        <option value="postulante">Postulante</option>
+        <option value="empresa">Empresa</option>
+      </select>
+      <div id="formExtra"></div>
+      <label>Email</label><input type="email" id="email">
+      <label>Contraseña</label><input type="password" id="password" minlength="6">
+      <button onclick="registrarUsuario()">Registrar</button>
+    </div>
+  `);
+  document.getElementById("tipoUsuario").addEventListener("change", cargarFormularioExtra);
+}
+
+function cargarFormularioExtra() {
+  const tipo = document.getElementById("tipoUsuario").value;
+  let extra = "";
+
+  if (tipo === "postulante") {
+    extra = `
+      <h3>Datos de Postulante</h3>
+      <label>Nombre completo</label><input id="p_nombre">
+      <label>Habilidades (separadas por comas)</label><input id="p_habilidades" placeholder="ej. excel, javascript, organizacion">
+      <label>Ciudad</label><input id="p_ciudad">
+      <label>Aspiración salarial</label><input id="p_sueldo">
+      <label>Número de celular</label><input id="p_celular">
+      <label>Resumen curricular (Imagen o PDF)</label><input type="file" id="p_cv" accept=".pdf,.jpg,.png,.jpeg">
+    `;
+  } else if (tipo === "empresa") {
+    extra = `
+      <h3>Datos de Empresa</h3>
+      <label>Nombre de la empresa</label><input id="e_nombre">
+      <label>Teléfono corporativo</label><input id="e_celular">
+    `;
+  }
+  document.getElementById("formExtra").innerHTML = extra;
+}
+
+async function registrarUsuario() {
+  const tipo = document.getElementById("tipoUsuario").value;
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  if (!tipo || !email || !password) {
+    alert("Completa todos los campos");
+    return;
+  }
+
+  const nuevo = { tipo, email, perfilPostulante: null, perfilEmpresa: null };
+
+  if (tipo === "postulante") {
+    const file = document.getElementById("p_cv").files[0];
+    if (!file) {
+      alert("Debes subir tu CV para completar el perfil.");
+      return;
+    }
+    const base64 = await fileToBase64Async(file);
+    nuevo.perfilPostulante = {
+      nombre: document.getElementById("p_nombre").value,
+      habilidades: document.getElementById("p_habilidades").value,
+      ciudad: document.getElementById("p_ciudad").value,
+      sueldo: document.getElementById("p_sueldo").value,
+      celular: document.getElementById("p_celular").value,
+      cv: base64
+    };
+  } else if (tipo === "empresa") {
+    nuevo.perfilEmpresa = {
+      nombreEmpresa: document.getElementById("e_nombre").value,
+      celular: document.getElementById("e_celular").value
+    };
+  }
+
+  try {
+    const credencial = await auth.createUserWithEmailAndPassword(email, password);
+    await db.collection("usuarios").doc(credencial.user.uid).set(nuevo);
+    currentUser = { id: credencial.user.uid, ...nuevo };
+    alert("Usuario registrado con éxito");
+    mostrarPanelSegunRol();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function mostrarLogin() {
+  render(`
+    <div class="box">
+      <h2>Iniciar sesión</h2>
+      <label>Email</label><input id="login_email">
+      <label>Contraseña</label><input type="password" id="login_password">
+      <button onclick="login()">Entrar</button>
+    </div>
+  `);
+}
+
+async function login() {
+  const email = document.getElementById("login_email").value;
+  const password = document.getElementById("login_password").value;
+
+  try {
+    const credencial = await auth.signInWithEmailAndPassword(email, password);
+    currentUser = await obtenerUsuarioPorId(credencial.user.uid);
+    mostrarPanelSegunRol();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function mostrarPanelSegunRol() {
+  if (!currentUser) return mostrarInicio();
+  if (currentUser.tipo === "postulante") panelPostulante();
+  else panelEmpresa();
+}
+
+function panelPostulante() {
+  render(`
+    <div class="box">
+      <h2>Panel de Postulante</h2>
+      <p>Bienvenido: <strong>${currentUser.perfilPostulante.nombre}</strong></p>
+      <button onclick="mostrarPerfil()">Mi perfil</button>
+      <button onclick="buscadorVacantes()">Buscador según mi perfil</button>
+      <button onclick="explorarVacantesPostulante()">Explorar vacantes</button>
+      <button onclick="cerrarSesion()" style="background:#b30000;">Cerrar sesión</button>
+    </div>
+  `);
+}
+
+function panelEmpresa() {
+  render(`
+    <div class="box">
+      <h2>Panel de Empresa</h2>
+      <p>Empresa: <strong>${currentUser.perfilEmpresa.nombreEmpresa}</strong></p>
+      <button onclick="mostrarPerfil()">Mi perfil</button>
+      <button onclick="formPublicarVacante()">Publicar vacante</button>
+      <button onclick="listarVacantesEmpresa()">Mis vacantes</button>
+      <button onclick="cerrarSesion()" style="background:#b30000;">Cerrar sesión</button>
+    </div>
+  `);
+}
+
+function mostrarPerfil() {
+  if (currentUser.tipo === "postulante") {
+    const p = currentUser.perfilPostulante;
+    render(`
+      <div class="box">
+        <h2>Mi Perfil</h2>
+        <label>Nombre completo</label><input id="edit_nombre" value="${p.nombre}">
+        <label>Habilidades</label><input id="edit_habilidades" value="${p.habilidades}">
+        <label>Ciudad</label><input id="edit_ciudad" value="${p.ciudad}">
+        <label>Aspiración salarial</label><input id="edit_sueldo" value="${p.sueldo}">
+        <label>Número de celular</label><input id="edit_celular" value="${p.celular}">
+        <label>Actualizar CV</label><input type="file" id="edit_cv" accept=".pdf,.jpg,.png,.jpeg">
+        <button onclick="guardarPerfilPostulante()">Guardar cambios</button>
+        <button onclick="mostrarPanelSegunRol()" style="background:#777;">Atrás</button>
+      </div>
+    `);
+  } else {
+    const e = currentUser.perfilEmpresa;
+    render(`
+      <div class="box">
+        <h2>Perfil de Empresa</h2>
+        <label>Nombre de la empresa</label><input id="edit_e_nombre" value="${e.nombreEmpresa}">
+        <label>Teléfono</label><input id="edit_e_celular" value="${e.celular}">
+        <button onclick="guardarPerfilEmpresa()">Guardar cambios</button>
+        <button onclick="mostrarPanelSegunRol()" style="background:#777;">Atrás</button>
+      </div>
+    `);
+  }
+}
+
+async function guardarPerfilPostulante() {
+  const p = currentUser.perfilPostulante;
+  const file = document.getElementById("edit_cv").files[0];
+  p.nombre = document.getElementById("edit_nombre").value;
+  p.habilidades = document.getElementById("edit_habilidades").value;
+  p.ciudad = document.getElementById("edit_ciudad").value;
+  p.sueldo = document.getElementById("edit_sueldo").value;
+  p.celular = document.getElementById("edit_celular").value;
+
+  if (file) p.cv = await fileToBase64Async(file);
+  await db.collection("usuarios").doc(currentUser.id).set(currentUser, { merge: true });
+  alert("Perfil actualizado con éxito");
+  mostrarPanelSegunRol();
+}
+
+async function guardarPerfilEmpresa() {
+  const e = currentUser.perfilEmpresa;
+  e.nombreEmpresa = document.getElementById("edit_e_nombre").value;
+  e.celular = document.getElementById("edit_e_celular").value;
+
+  await db.collection("usuarios").doc(currentUser.id).set(currentUser, { merge: true });
+  alert("Perfil de empresa actualizado");
+  mostrarPanelSegunRol();
+}
+
+function formPublicarVacante() {
+  render(`
+    <div class="box">
+      <h2>Publicar nueva vacante</h2>
+      <label>Título del puesto</label><input id="v_titulo">
+      <label>Área</label>
+      <select id="v_area">
+        <option>Administración</option><option>Tecnología</option>
+        <option>Ventas</option><option>Producción</option>
+        <option>Mantenimiento</option><option>Recursos Humanos</option>
+      </select>
+      <label>Salario</label><input id="v_salario">
+      <label>Estado / Ubicación</label><input id="v_estado" value="Lara">
+      <label>Horario</label><input id="v_horario">
+      <label>Habilidades requeridas (separadas por comas)</label><input id="v_habilidades">
+      <label>Descripción del puesto</label><textarea id="v_descripcion"></textarea>
+      <label>Experiencia requerida</label><input id="v_experiencia">
+      <button onclick="guardarVacante()">Publicar oferta</button>
+      <button onclick="panelEmpresa()" style="background:#777;">Cancelar</button>
+    </div>
+  `);
+}
+
+async function guardarVacante() {
+  const nuevaVacante = {
+    empresaId: currentUser.id,
+    titulo: document.getElementById("v_titulo").value,
+    area: document.getElementById("v_area").value,
+    salario: document.getElementById("v_salario").value,
+    estado: document.getElementById("v_estado").value,
+    horario: document.getElementById("v_horario").value,
+    habilidades: document.getElementById("v_habilidades").value,
+    descripcion: document.getElementById("v_descripcion").value,
+    experiencia: document.getElementById("v_experiencia").value,
+    postulados: []
+  };
+
+  await db.collection("vacantes").add(nuevaVacante);
+  alert("Oferta publicada y guardada exitosamente");
+  panelEmpresa();
+}
+
+function listarVacantesEmpresa() {
+  let html = `<div class="box"><h2>Tus ofertas de empleo publicadas</h2>`;
+  const misVacantes = vacantes.filter(v => v.empresaId === currentUser.id);
+
+  if (misVacantes.length === 0) {
+    html += `<p>No has publicado ninguna oferta laboral todavía.</p>`;
+  } else {
+    misVacantes.forEach(v => {
+      const totalPostulados = v.postulados ? v.postulados.length : 0;
+      html += `
+        <div class="vacante">
+          <strong>${v.titulo}</strong> (${v.area})
+          <p>Postulantes registrados hasta ahora: <b style="color:#004080;">${totalPostulados}</b></p>
+          <button onclick="verPostulados('${v.id}')">Revisar postulados</button>
+        </div>
+      `;
+    });
+  }
+  html += `<button onclick="panelEmpresa()" style="background:#777;">Volver al panel</button></div>`;
+  render(html);
+}
+
+function verPostulados(idVacante) {
+  const v = vacantes.find(x => x.id === idVacante);
+  let html = `<div class="box"><h2>Candidatos para: ${v.titulo}</h2>`;
+
+  if (!v.postulados || v.postulados.length === 0) {
+    html += `<p>Aún no hay ningún postulado para esta oferta.</p>`;
+  } else {
+    v.postulados.forEach(reg => {
+      html += `
+        <div class="vacante">
+          <strong>${reg.nombrePostulante}</strong>
+          <p><b>Habilidades:</b> ${reg.habilidadesPostulante} | <b>Ciudad:</b> ${reg.ciudadPostulante}</p>
+          <p><b>Resultado Test:</b> <span style="color:#003366; font-weight:bold;">${reg.perfil}</span></p>
+          <button onclick="verPerfilCompletoPostulante('${reg.id}', '${idVacante}')">Ver perfil completo y gráfico</button>
+        </div>
+      `;
+    });
+  }
+  html += `<button onclick="listarVacantesEmpresa()" style="background:#777;">Atrás</button></div>`;
+  render(html);
+}
+
+function verPerfilCompletoPostulante(idPostulante, idVacante) {
+  const v = vacantes.find(x => x.id === idVacante);
+  const reg = v.postulados.find(x => x.id === idPostulante);
+
+  render(`
+    <div class="box">
+      <h2>Expediente del Candidato</h2>
+      <div class="split-container">
+        <div class="split-left">
+          <p><b>Nombre:</b> ${reg.nombrePostulante}</p>
+          <p><b>Celular:</b> ${reg.celularPostulante}</p>
+          <p><b>Ubicación:</b> ${reg.ciudadPostulante}</p>
+          <p><b>Aspiración Salarial:</b> ${reg.sueldoPostulante}</p>
+          <p><b>Habilidades del Candidato:</b> ${reg.habilidadesPostulante}</p>
+          <hr>
+          <h3>Análisis del Test de Personalidad</h3>
+          <p><b>Rasgo Predominante:</b> <span style="color:green; font-weight:bold;">${reg.perfil}</span></p>
+          <ul>
+            <li>Apertura al cambio: ${reg.resultados.apertura} / 30</li>
+            <li>Responsabilidad: ${reg.resultados.responsabilidad} / 30</li>
+            <li>Extroversión: ${reg.resultados.extroversion} / 30</li>
+            <li>Amabilidad: ${reg.resultados.amabilidad} / 30</li>
+            <li>Estabilidad emocional: ${reg.resultados.estabilidad} / 30</li>
+          </ul>
+          ${reg.cvPostulante ? `<br><a href="${reg.cvPostulante}" download="CV_${reg.nombrePostulante}.pdf" style="background:#004080; color:white; padding:10px; text-decoration:none; border-radius:5px; display:inline-block;">Descargar Currículum Vitae</a>` : '<p>No adjuntó documento</p>'}
+        </div>
+        <div class="split-right">
+          <canvas id="graficoTest" width="300" height="300"></canvas>
+        </div>
+      </div>
+      <button onclick="verPostulados('${idVacante}')" style="background:#777; margin-top:15px;">Atrás a la lista</button>
+    </div>
+  `);
+
+  const ctx = document.getElementById('graficoTest').getContext('2d');
+  new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['Apertura', 'Responsabilidad', 'Extroversión', 'Amabilidad', 'Estabilidad'],
+      datasets: [{
+        label: 'Perfil de Personalidad (Max 30)',
+        data: [reg.resultados.apertura, reg.resultados.responsabilidad, reg.resultados.extroversion, reg.resultados.amabilidad, reg.resultados.estabilidad],
+        backgroundColor: 'rgba(0, 51, 102, 0.15)',
+        borderColor: 'rgba(0, 51, 102, 1)',
+        borderWidth: 2
+      }]
+    },
+    options: { scales: { r: { suggestMin: 0, suggestMax: 30 } } }
+  });
+}
+
+function buscadorVacantes() {
+  if (!currentUser || !currentUser.perfilPostulante) return;
+
+  const habsUser = currentUser.perfilPostulante.habilidades.toLowerCase().split(',').map(h => h.trim());
+  const filtradas = vacantes.filter(v => {
+    if (!v.habilidades) return false;
+    const habsVacante = v.habilidades.toLowerCase().split(',').map(h => h.trim());
+    return habsUser.some(h => habsVacante.includes(h));
+  });
+
+  let html = `<div class="box"><h2>Vacantes recomendadas según tus habilidades</h2>`;
+  html += `<p><small>Tus etiquetas de perfil: <b>${currentUser.perfilPostulante.habilidades}</b></small></p>`;
+
+  if (filtradas.length === 0) {
+    html += `<p>No hay ofertas exactas para tus habilidades de perfil en este momento, pero puedes explorar la lista global.</p>`;
+  } else {
+    filtradas.forEach(v => {
+      html += `
+        <div class="vacante">
+          <strong>${v.titulo}</strong> — <span style="color:#003366;">${v.area}</span>
+          <p>${v.descripcion}</p>
+          <button onclick="verVacanteConEvaluacion('${v.id}')">Ver detalles</button>
+        </div>
+      `;
+    });
+  }
+  html += `<button onclick="panelPostulante()" style="background:#777;">Atrás</button></div>`;
+  render(html);
+}
+
+/* LISTADO DE LAS 30 PREGUNTAS DEL TEST BIG FIVE CON SU MENÚ DESPLEGABLE */
+function verVacanteConEvaluacion(idVacante) {
+  const v = vacantes.find(x => x.id === idVacante);
+  if (!v) return;
+
+  let yaPostulado = v.postulados ? v.postulados.some(p => p.id === currentUser?.id) : false;
+
+  let html = `
+    <div class="box">
+      <h2>${v.titulo}</h2>
+      <p><b>Área:</b> ${v.area} | <b>Salario:</b> ${v.salario} | <b>Ubicación:</b> ${v.estado}</p>
+      <p><b>Descripción:</b> ${v.descripcion}</p>
+      <p><b>Requisitos:</b> ${v.habilidades}</p>
+      <hr>
+  `;
+
+  if (yaPostulado) {
+    html += `<p style="color:green; font-weight:bold; font-size:1.1em;">✓ Ya te encuentras postulado a este puesto de trabajo.</p>`;
+  } else if (currentUser && currentUser.tipo === "postulante") {
+    
+    // Matriz de las 30 preguntas originales estructuradas bajo el modelo Big Five
+    const preguntas = [
+      // APERTURA AL CAMBIO
+      { id: 1, texto: "¿Se le ocurren ideas de forma continua y con facilidad?" },
+      { id: 2, texto: "¿Tiene un interés profundo por el arte, la literatura o la estética?" },
+      { id: 3, texto: "¿Disfruta de la variedad y de probar cosas nuevas constantemente?" },
+      { id: 4, texto: "¿Tiene una imaginación activa y tiende a fantasear despierto?" },
+      { id: 5, texto: "¿Le entusiasma desarmar cosas o analizar conceptos abstractos complejos?" },
+      { id: 6, texto: "¿Prefiere romper con la rutina e ir a lugares desconocidos?" },
+      
+      // RESPONSABILIDAD
+      { id: 7, texto: "¿Es una persona sumamente estructurada y organizada en su rutina diaria?" },
+      { id: 8, texto: "¿Siempre cumple con sus obligaciones y tareas a tiempo de forma rigurosa?" },
+      { id: 9, texto: "¿Es perfeccionista y presta máxima atención a los pequeños detalles?" },
+      { id: 10, texto: "¿Piensa cuidadosamente los pros y contras antes de tomar una decisión importante?" },
+      { id: 11, texto: "¿Tiene claros sus objetivos a largo plazo y trabaja metódicamente por ellos?" },
+      { id: 12, texto: "¿Se considera una persona de alta confiabilidad en situaciones de presión?" },
+      
+      // EXTROVERSIÓN
+      { id: 13, texto: "¿Disfruta ser el centro de atención en reuniones o eventos sociales?" },
+      { id: 14, texto: "¿Se siente lleno de energía después de interactuar y compartir con mucha gente?" },
+      { id: 15, texto: "¿Le resulta muy fácil hacer nuevos amigos e iniciar conversaciones?" },
+      { id: 16, texto: "¿Suele asumir el rol de liderazgo o dirigir grupos de forma natural?" },
+      { id: 17, texto: "¿Expresa sus emociones y opiniones de manera abierta y asertiva?" },
+      { id: 18, texto: "¿Prefiere los entornos de trabajo dinámicos, rápidos y ruidosos?" },
+      
+      // AMABILIDAD
+      { id: 19, texto: "¿Suele anteponer las necesidades de los demás a las suyas por empatía?" },
+      { id: 20, texto: "¿Confía ciegamente en las buenas intenciones de las personas que le rodean?" },
+      { id: 21, texto: "¿Evita activamente los conflictos y discusiones buscando la armonía colectiva?" },
+      { id: 22, texto: "¿Se conmueve con facilidad ante los problemas o el sufrimiento ajeno?" },
+      { id: 23, texto: "¿Disfruta cooperar en equipo y ayudar desinteresadamente a sus compañeros?" },
+      { id: 24, texto: "¿Trata a todas las personas con extrema cortesía, respeto y amabilidad?" },
+      
+      // ESTABILIDAD EMOCIONAL
+      { id: 25, texto: "¿Mantiene la calma y la mente fría durante situaciones críticas o imprevistos?" },
+      { id: 26, texto: "¿Rara vez experimenta cambios bruscos de humor o bajones de ánimo cotidianos?" },
+      { id: 27, texto: "¿Maneja bien la crítica y el rechazo laboral sin tomárselo de manera personal?" },
+      { id: 28, texto: "¿Se siente seguro de sus capacidades técnicas y profesionales en general?" },
+      { id: 29, texto: "¿Le resulta sencillo relajarse e ignorar las preocupaciones del día a día?" },
+      { id: 30, texto: "¿Afronta el estrés laboral diario sin desarrollar ansiedad o frustración excesiva?" }
+    ];
+
+    html += `
+      <h3>Test de Evaluación Obligatorio</h3>
+      <p>Selecciona tu respuesta en la escala: 
+         <strong>1</strong> (Totalmente en desacuerdo), 
+         <strong>2</strong> (En desacuerdo), 
+         <strong>3</strong> (Neutral), 
+         <strong>4</strong> (De acuerdo), 
+         <strong>5</strong> (Totalmente de acuerdo).
+      </p>
+      <div id="testForm">
+    `;
+
+    preguntas.forEach(p => {
+      html += `
+        <div class="pregunta-test">
+          <p>${p.id}. ${p.texto}</p>
+          <select id="q_${p.id}" required>
+            <option value="">-- Elige una opción --</option>
+            <option value="1">1 - Totalmente en desacuerdo</option>
+            <option value="2">2 - En desacuerdo</option>
+            <option value="3">3 - Neutral</option>
+            <option value="4">4 - De acuerdo</option>
+            <option value="5">5 - Totalmente de acuerdo</option>
+          </select>
+        </div>
+      `;
+    });
+
+    html += `
+        <button onclick="procesarPostulacion('${v.id}')" style="background:#28a745; margin-top:25px;">Enviar mi postulación</button>
+      </div>
+    `;
+  } else {
+    html += `<p>Inicia sesión como postulante para aplicar.</p>`;
+  }
+
+  html += `<button onclick="mostrarPanelSegunRol()" style="background:#777; margin-top:10px;">Atrás</button></div>`;
+  render(html);
+}
+
+/* PROCESAR LAS 30 RESPUESTAS Y ASIGNAR DIRECTAMENTE AL MÁXIMO DE 30 PUNTOS POR RASGO */
+async function procesarPostulacion(idVacante) {
+  const respuestas = [];
+  
+  // Validar y capturar el valor de las 30 preguntas individuales
+  for (let i = 1; i <= 30; i++) {
+    const el = document.getElementById(`q_${i}`);
+    if (!el || el.value === "") {
+      alert(`Por favor responde la pregunta número ${i} antes de continuar.`);
+      return;
+    }
+    respuestas.push(parseInt(el.value));
+  }
+
+  // Sumas directas de los 6 ítems asignados por cada rasgo psicológico (Suma Máxima = 30 puntos)
+  const resultados = {
+    apertura:         respuestas[0] + respuestas[1] + respuestas[2] + respuestas[3] + respuestas[4] + respuestas[5],
+    responsabilidad:  respuestas[6] + respuestas[7] + respuestas[8] + respuestas[9] + respuestas[10] + respuestas[11],
+    extroversion:     respuestas[12] + respuestas[13] + respuestas[14] + respuestas[15] + respuestas[16] + respuestas[17],
+    amabilidad:       respuestas[18] + respuestas[19] + respuestas[20] + respuestas[21] + respuestas[22] + respuestas[23],
+    estabilidad:      respuestas[24] + respuestas[25] + respuestas[26] + respuestas[27] + respuestas[28] + respuestas[29]
+  };
+
+  // Encontrar el perfil predominante real
+  let maxValor = 0;
+  let perfilDeterminado = "Balanceado";
+  for (const [rasgo, valor] of Object.entries(resultados)) {
+    if (valor > maxValor) { 
+      maxValor = valor; 
+      perfilDeterminado = rasgo.charAt(0).toUpperCase() + rasgo.slice(1); 
+    }
+  }
+
+  const p = currentUser.perfilPostulante;
+
+  const nuevaPostulacion = {
+    id: currentUser.id,
+    perfil: perfilDeterminado,
+    resultados: resultados,
+    fecha: new Date().toISOString(),
+    nombrePostulante: p.nombre,
+    habilidadesPostulante: p.habilidades,
+    ciudadPostulante: p.ciudad,
+    sueldoPostulante: p.sueldo,
+    celularPostulante: p.celular,
+    cvPostulante: p.cv
+  };
+
+  try {
+    const vRef = db.collection("vacantes").doc(idVacante);
+    const doc = await vRef.get();
+
+    if (doc.exists) {
+      const datosVacante = doc.data();
+      const lista = datosVacante.postulados || [];
+
+      if (!lista.some(x => x.id === currentUser.id)) {
+        lista.push(nuevaPostulacion);
+        await vRef.update({ postulados: lista });
+        alert("¡Tu postulación con tu perfil y las 30 respuestas del test ha sido registrada con éxito!");
+      } else {
+        alert("Ya estás postulado a esta oferta.");
+      }
+    }
+    explorarVacantesPostulante();
+  } catch (error) {
+    alert("Error al guardar postulación: " + error.message);
+  }
+}
+
+function explorarVacantesPostulante() {
+  let html = `<div class="box"><h2>Ofertas de empleo disponibles</h2>`;
+  vacantes.forEach(v => {
+    html += `
+      <div class="vacante">
+        <strong>${v.titulo}</strong> — <b>${v.salario}</b>
+        <p>${v.descripcion}</p>
+        <button onclick="verVacanteConEvaluacion('${v.id}')">Ver detalles</button>
+      </div>
+    `;
+  });
+  html += `<button onclick="panelPostulante()" style="background:#777;">Atrás</button></div>`;
+  render(html);
+}
+
+function mostrarRegistro() {
+  render(`
+    <div class="box">
+      <h2>Registro</h2>
+      <label>Tipo de usuario</label>
+      <select id="tipoUsuario">
+        <option value="">-- Selecciona --</option>
+        <option value="postulante">Postulante</option>
+        <option value="empresa">Empresa</option>
+      </select>
+      <div id="formExtra"></div>
+      <label>Email</label><input type="email" id="email">
+      <label>Contraseña</label><input type="password" id="password" minlength="6">
+      <button onclick="registrarUsuario()">Registrar</button>
+    </div>
+  `);
+  document.getElementById("tipoUsuario").addEventListener("change", cargarFormularioExtra);
+}
+
+async function cerrarSesion() {
+  if (auth) await auth.signOut();
+  currentUser = null;
+  mostrarInicio();
+}
+  </script>
+</body>
+</html>
